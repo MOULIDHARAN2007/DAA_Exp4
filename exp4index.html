@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dijkstra — Step by Step</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:        #0A121F;
+    --panel:     #101B2E;
+    --panel-2:   #0D1626;
+    --line:      #22314A;
+    --slate:     #7E92AC;
+    --text:      #EAF2FF;
+    --cyan:      #5EEAD4;
+    --amber:     #F5B942;
+    --coral:     #FF6B6B;
+    --coral-dim: rgba(255,107,107,0.15);
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(94,234,212,0.06), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(245,185,66,0.05), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    min-height:100vh;
+    padding:32px 24px 60px;
+  }
+
+  header{
+    max-width:1180px;
+    margin:0 auto 28px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:20px;
+  }
+  .title-block h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:clamp(26px, 4vw, 36px);
+    letter-spacing:-0.01em;
+  }
+  .title-block h1 span{color:var(--cyan);}
+  .title-block p{
+    color:var(--slate);
+    font-size:13px;
+    margin-top:6px;
+    max-width:520px;
+    line-height:1.5;
+  }
+  .complexity{
+    text-align:right;
+    font-size:12px;
+    color:var(--slate);
+    line-height:1.9;
+  }
+  .complexity b{color:var(--amber); font-weight:600;}
+
+  main{
+    max-width:1180px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:1.5fr 1fr;
+    gap:20px;
+  }
+  @media (max-width:900px){ main{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px;
+  }
+  .panel h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--slate);
+    margin-bottom:14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel h2::before{
+    content:'';
+    width:6px; height:6px;
+    background:var(--cyan);
+    border-radius:50%;
+    display:inline-block;
+  }
+
+  /* ---- Graph ---- */
+  #graphWrap{ position:relative; }
+  svg{ width:100%; height:auto; display:block; }
+  .edge-line{ stroke:var(--line); stroke-width:2.5; transition:stroke .25s, stroke-width .25s, filter .25s; }
+  .edge-line.checking{ stroke:var(--amber); stroke-width:3.5; filter:drop-shadow(0 0 6px rgba(245,185,66,0.7)); }
+  .edge-line.tree{ stroke:var(--cyan); stroke-width:3.5; filter:drop-shadow(0 0 6px rgba(94,234,212,0.5)); }
+  .edge-weight{
+    fill:var(--slate); font-size:13px; font-weight:600;
+  }
+  .edge-weight.checking{ fill:var(--amber); }
+  .edge-weight.tree{ fill:var(--cyan); }
+
+  .node circle.ring{
+    fill:var(--panel-2);
+    stroke:var(--line);
+    stroke-width:2.5;
+    transition:stroke .25s, fill .25s, filter .25s;
+  }
+  .node.visited circle.ring{ stroke:var(--cyan); fill:rgba(94,234,212,0.08); }
+  .node.current circle.ring{
+    stroke:var(--amber); fill:rgba(245,185,66,0.15);
+    filter:drop-shadow(0 0 10px rgba(245,185,66,0.8));
+  }
+  .node.source circle.source-mark{ fill:none; stroke:var(--amber); stroke-width:1.5; stroke-dasharray:3 3; }
+  .node text.label{ fill:var(--text); font-family:'Space Grotesk', sans-serif; font-size:16px; font-weight:700; text-anchor:middle; }
+  .node text.dist{ fill:var(--slate); font-size:11px; text-anchor:middle; font-weight:600; }
+  .node.visited text.dist{ fill:var(--cyan); }
+  .node.current text.dist{ fill:var(--amber); }
+
+  /* ---- Table ---- */
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th{ text-align:left; color:var(--slate); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); text-transform:uppercase; font-size:10.5px; letter-spacing:.05em;}
+  td{ padding:7px 8px; border-bottom:1px solid var(--line); color:var(--text); }
+  tr.row-current td{ background:rgba(245,185,66,0.08); }
+  tr.row-visited td:first-child{ color:var(--cyan); font-weight:700; }
+  .dist-inf{ color:var(--slate); }
+
+  /* ---- PQ ---- */
+  #pqList{ display:flex; flex-wrap:wrap; gap:8px; min-height:32px; }
+  .pq-chip{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:5px 10px;
+    font-size:12px;
+    color:var(--text);
+  }
+  .pq-chip b{ color:var(--amber); }
+  .pq-empty{ color:var(--slate); font-size:12px; }
+
+  /* ---- Log / narrative ---- */
+  #stepMsg{
+    font-size:13.5px;
+    line-height:1.6;
+    color:var(--text);
+    background:var(--panel-2);
+    border-left:3px solid var(--amber);
+    padding:12px 14px;
+    border-radius:4px;
+    min-height:44px;
+  }
+  #stepCounter{ color:var(--slate); font-size:12px; margin-top:8px; }
+  #stepCounter b{ color:var(--cyan); }
+
+  /* ---- Controls ---- */
+  .controls{ display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  button{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:600;
+    font-size:13px;
+    background:var(--panel-2);
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:9px 16px;
+    cursor:pointer;
+    transition:border-color .2s, color .2s, background .2s;
+  }
+  button:hover{ border-color:var(--cyan); color:var(--cyan); }
+  button:active{ transform:translateY(1px); }
+  button.primary{ background:var(--amber); color:#1B1305; border-color:var(--amber); }
+  button.primary:hover{ background:#ffc75c; color:#1B1305; }
+  button:disabled{ opacity:.35; cursor:not-allowed; }
+  button:disabled:hover{ border-color:var(--line); color:var(--text); }
+
+  select#speedSelect{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:600;
+    font-size:13px;
+    background:var(--panel-2);
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:9px 10px;
+    cursor:pointer;
+  }
+  select#speedSelect:focus{ outline:none; border-color:var(--cyan); }
+  select#speedSelect:hover{ border-color:var(--cyan); color:var(--cyan); }
+
+  progress{
+    width:100%; height:5px; margin-top:14px;
+    accent-color: var(--cyan);
+    appearance:none; border:none; border-radius:3px; overflow:hidden;
+  }
+  progress::-webkit-progress-bar{ background:var(--line); border-radius:3px; }
+  progress::-webkit-progress-value{ background:var(--cyan); border-radius:3px; }
+
+  .legend{ display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; font-size:11.5px; color:var(--slate);}
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .dot.slate{ background:var(--panel-2); border:2px solid var(--line); }
+  .dot.amber{ background:var(--amber); }
+  .dot.cyan{ background:var(--cyan); }
+
+  footer{
+    max-width:1180px; margin:36px auto 0; text-align:center;
+    color:var(--slate); font-size:11.5px;
+  }
+
+  /* ---- Input panel ---- */
+  label.field-label{
+    display:block; font-size:11px; color:var(--slate);
+    text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;
+  }
+  textarea#edgeInput{
+    width:100%; min-height:110px; resize:vertical;
+    background:var(--panel-2); color:var(--text);
+    border:1px solid var(--line); border-radius:6px;
+    font-family:'JetBrains Mono', monospace; font-size:12.5px;
+    padding:10px; line-height:1.6;
+  }
+  textarea#edgeInput:focus, input#sourceInput:focus{ outline:none; border-color:var(--cyan); }
+  input#sourceInput{
+    width:90px; background:var(--panel-2); color:var(--text);
+    border:1px solid var(--line); border-radius:6px;
+    font-family:'JetBrains Mono', monospace; font-size:13px;
+    padding:8px 10px;
+  }
+  .input-row{ display:flex; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap; }
+  #inputHint{ font-size:11px; color:var(--slate); margin-top:8px; line-height:1.5; }
+  #inputError{ font-size:12px; color:var(--coral); margin-top:8px; min-height:16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <h1>Dijkstra<span>'s</span> Algorithm</h1>
+    <p>A frame-by-frame walkthrough of shortest-path discovery from a single source, using a min-priority queue to always expand the nearest unvisited vertex next.</p>
+  </div>
+  <div class="complexity">
+    Time &nbsp;<b>O((V + E) log V)</b><br>
+    Space &nbsp;<b>O(V)</b>
+  </div>
+</header>
+
+  <div class="panel" style="max-width:1180px; margin:0 auto 20px;">
+    <h2>Build Your Own Graph</h2>
+    <label class="field-label" for="edgeInput">Edges — one per line: <code>u v weight</code></label>
+    <textarea id="edgeInput" spellcheck="false">0 1 4
+0 2 1
+1 3 1
+2 1 2
+2 3 5
+3 4 3
+4 5 2</textarea>
+    <div class="input-row">
+      <div>
+        <label class="field-label" for="sourceInput">Source vertex</label>
+        <input id="sourceInput" type="text" value="0">
+      </div>
+      <button id="btnBuild" class="primary" style="align-self:flex-end;">▶ Run Dijkstra</button>
+      <button id="btnExample" style="align-self:flex-end;">↺ Load Example</button>
+    </div>
+    <div id="inputHint">Directed edges, one per line. Vertices can be any labels (numbers or names) — separate <code>u</code>, <code>v</code>, and <code>weight</code> with spaces or commas. Weights should be non‑negative.</div>
+    <div id="inputError"></div>
+  </div>
+
+<main>
+  <div class="panel" id="graphWrap">
+    <h2>Graph &amp; Frontier</h2>
+    <svg id="svg" viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="legend">
+      <span><i class="dot slate"></i>unvisited</span>
+      <span><i class="dot amber"></i>current / checking</span>
+      <span><i class="dot cyan"></i>visited / tree edge</span>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:20px;">
+    <div class="panel">
+      <h2>Narration</h2>
+      <div id="stepMsg">—</div>
+      <div id="stepCounter">Step <b id="stepNow">0</b> / <span id="stepTotal">0</span></div>
+      <progress id="stepProgress" value="0" max="1"></progress>
+      <div class="controls">
+        <button id="btnReset">⟲ Reset</button>
+        <button id="btnPrev">← Prev</button>
+        <button id="btnPlay" class="primary">▶ Play</button>
+        <button id="btnNext">Next →</button>
+        <select id="speedSelect" aria-label="Playback speed">
+          <option value="2200">0.5×</option>
+          <option value="1400" selected>1×</option>
+          <option value="800">2×</option>
+          <option value="400">4×</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Priority Queue</h2>
+      <div id="pqList"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Distance Table</h2>
+      <table>
+        <thead><tr><th>V</th><th>Dist</th><th>Path from 0</th></tr></thead>
+        <tbody id="distBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer id="pageFooter">Source vertex: 0 &nbsp;·&nbsp; step through with the controls, or press → / ← on your keyboard</footer>
+
+<script>
+/* ---------------- State ---------------- */
+let graph = {};        // { idx: [[idx, weight], ...] }
+let labels = [];       // idx -> display label
+let positions = {};    // idx -> [x,y]
+let SOURCE = 0;
+let N = 0;
+let frames = [];
+let idx = 0;
+let playTimer = null;
+
+const svgNS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('svg');
+
+/* ---------------- Parse textarea into a graph ---------------- */
+function parseGraph(text, sourceRaw){
+  const labelToIdx = new Map();
+  const edgesRaw = [];
+
+  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length);
+  if (!lines.length) throw new Error('Add at least one edge, e.g. "0 1 4".');
+
+  for (const line of lines){
+    const parts = line.split(/[\s,]+/).filter(Boolean);
+    if (parts.length < 3) throw new Error(`Line "${line}" needs 3 values: u, v, weight.`);
+    const [u, v, wStr] = parts;
+    const w = Number(wStr);
+    if (Number.isNaN(w)) throw new Error(`Weight "${wStr}" in "${line}" is not a number.`);
+    if (w < 0) throw new Error(`Edge "${line}": Dijkstra requires non-negative weights.`);
+    edgesRaw.push([u, v, w]);
+  }
+
+  const ensureIdx = (label) => {
+    if (!labelToIdx.has(label)) labelToIdx.set(label, labelToIdx.size);
+    return labelToIdx.get(label);
+  };
+
+  edgesRaw.forEach(([u,v])=>{ ensureIdx(u); ensureIdx(v); });
+
+  const srcLabel = sourceRaw.trim();
+  if (!srcLabel) throw new Error('Enter a source vertex.');
+  if (!labelToIdx.has(srcLabel)) {
+    // allow the source to be a brand-new isolated vertex
+    ensureIdx(srcLabel);
+  }
+
+  const n = labelToIdx.size;
+  const g = {};
+  for (let i=0;i<n;i++) g[i] = [];
+  edgesRaw.forEach(([u,v,w])=>{
+    g[labelToIdx.get(u)].push([labelToIdx.get(v), w]);
+  });
+
+  const lbls = Array(n);
+  labelToIdx.forEach((i,label)=>{ lbls[i] = label; });
+
+  return { graph:g, labels:lbls, source: labelToIdx.get(srcLabel), n };
+}
+
+/* ---------------- Circular layout ---------------- */
+function computeLayout(n){
+  const pos = {};
+  const cx = 470, cy = 230, r = Math.min(320, 90 + n*22);
+  for (let i=0;i<n;i++){
+    const angle = (2*Math.PI*i/n) - Math.PI/2;
+    pos[i] = [cx + r*Math.cos(angle), cy + r*Math.sin(angle)];
+  }
+  return pos;
+}
+
+/* ---------------- Run Dijkstra, recording a frame at every meaningful event ---------------- */
+function runDijkstra(){
+  let dist = Array(N).fill(Infinity);
+  let prev = Array(N).fill(null);
+  let visited = new Set();
+  dist[SOURCE] = 0;
+  let pq = [[0, SOURCE]];
+  const frames = [];
+
+  const snap = (msg, current, edge, edgeState) => frames.push({
+    msg,
+    dist: dist.slice(),
+    prev: prev.slice(),
+    visited: new Set(visited),
+    pq: pq.map(x=>x.slice()).sort((a,b)=>a[0]-b[0]),
+    current, edge, edgeState
+  });
+
+  snap(`Initialize: dist[${labels[SOURCE]}] = 0, all other distances = ∞. Push (0, ${labels[SOURCE]}) onto the queue.`, null, null, null);
+
+  while (pq.length){
+    pq.sort((a,b)=>a[0]-b[0]);
+    const [d, u] = pq.shift();
+
+    if (visited.has(u)){
+      snap(`Pop (${d}, ${labels[u]}) — vertex ${labels[u]} is already finalized, skip it.`, u, null, null);
+      continue;
+    }
+    visited.add(u);
+    snap(`Pop (${d}, ${labels[u]}) — smallest tentative distance in queue. Mark vertex ${labels[u]} as visited.`, u, null, null);
+
+    for (const [v, w] of graph[u]){
+      const before = dist[v];
+      snap(`Check edge ${labels[u]} → ${labels[v]} (weight ${w}): ${d} + ${w} = ${d+w} vs current dist[${labels[v]}] = ${before===Infinity?'∞':before}.`, u, [u,v], 'checking');
+      if (d + w < dist[v]){
+        dist[v] = d + w;
+        prev[v] = u;
+        pq.push([dist[v], v]);
+        snap(`Relax! ${d}+${w} < ${before===Infinity?'∞':before} → dist[${labels[v]}] updated to ${dist[v]}, reached via ${labels[u]}.`, u, [u,v], 'tree');
+      }
+    }
+  }
+  snap('Queue empty. All shortest distances are finalized.', null, null, null);
+  return frames;
+}
+
+/* ---------------- Build SVG (nodes + edges) for the current graph ---------------- */
+let edgeEls = {};
+let nodeEls = {};
+
+function edgeKey(u,v){ return u+'->'+v; }
+
+// Register a rendered edge element under its key, keeping ALL elements for
+// that key (there can be more than one parallel edge between the same u,v).
+function addEdgeEl(u,v,line,label){
+  const key = edgeKey(u,v);
+  if (!edgeEls[key]) edgeEls[key] = [];
+  edgeEls[key].push({line, label});
+}
+
+function buildSvg(){
+  svg.innerHTML = '';
+  edgeEls = {};
+  nodeEls = {};
+
+  const defs = document.createElementNS(svgNS,'defs');
+  defs.innerHTML = `<marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+    <path d="M0,0 L0,6 L6,3 z" fill="#22314A" id="arrowHead"/>
+  </marker>`;
+  svg.appendChild(defs);
+
+  // edges first (under nodes). Group by (u,v) pair first so that parallel
+  // edges (same u,v, different weight) can be fanned out instead of
+  // overlapping exactly on top of one another.
+  const pairGroups = new Map(); // key "u->v" -> [w, w, ...]
+  Object.entries(graph).forEach(([uStr, list])=>{
+    const u = +uStr;
+    list.forEach(([v, w])=>{
+      const key = edgeKey(u,v);
+      if (!pairGroups.has(key)) pairGroups.set(key, []);
+      pairGroups.get(key).push(w);
+    });
+  });
+
+  pairGroups.forEach((weights, key)=>{
+    const [uStr, vStr] = key.split('->');
+    const u = +uStr, v = +vStr;
+    const isSelfLoop = (u === v);
+
+    weights.forEach((w, i)=>{
+      // spread parallel edges apart perpendicular to the u-v axis
+      const spread = weights.length > 1 ? (i - (weights.length-1)/2) * 16 : 0;
+
+      if (isSelfLoop){
+        // draw a small loop arc above the node
+        const [x,y] = positions[u];
+        const loopR = 22 + i*10;
+        const topX = x, topY = y - 28;
+        const path = document.createElementNS(svgNS,'path');
+        const d = `M ${x-10},${topY+2} C ${x-loopR},${topY-loopR} ${x+loopR},${topY-loopR} ${x+10},${topY+2}`;
+        path.setAttribute('d', d);
+        path.setAttribute('fill','none');
+        path.setAttribute('class','edge-line');
+        path.setAttribute('marker-end','url(#arrow)');
+        svg.appendChild(path);
+
+        const label = document.createElementNS(svgNS,'text');
+        label.setAttribute('x', x);
+        label.setAttribute('y', topY - loopR + 4);
+        label.setAttribute('text-anchor','middle');
+        label.setAttribute('class','edge-weight');
+        label.textContent = w;
+        svg.appendChild(label);
+
+        addEdgeEl(u, v, path, label);
+        return;
+      }
+
+      const [x1,y1] = positions[u], [x2,y2] = positions[v];
+      const dx = x2-x1, dy = y2-y1;
+      const len = Math.sqrt(dx*dx+dy*dy) || 1;
+      const ux = dx/len, uy = dy/len;
+      const nx = -uy, ny = ux; // perpendicular unit vector
+      const r = 30;
+      const sx = x1+ux*r + nx*spread, sy = y1+uy*r + ny*spread;
+      const ex = x2-ux*(r+9) + nx*spread, ey = y2-uy*(r+9) + ny*spread;
+
+      const line = document.createElementNS(svgNS,'line');
+      line.setAttribute('x1',sx); line.setAttribute('y1',sy);
+      line.setAttribute('x2',ex); line.setAttribute('y2',ey);
+      line.setAttribute('class','edge-line');
+      line.setAttribute('marker-end','url(#arrow)');
+      svg.appendChild(line);
+
+      const mx = (x1+x2)/2 + nx*(14+spread), my = (y1+y2)/2 + ny*(14+spread);
+      const label = document.createElementNS(svgNS,'text');
+      label.setAttribute('x',mx); label.setAttribute('y',my);
+      label.setAttribute('class','edge-weight');
+      label.textContent = w;
+      svg.appendChild(label);
+
+      addEdgeEl(u, v, line, label);
+    });
+  });
+
+  // nodes
+  Object.entries(positions).forEach(([kStr,[x,y]])=>{
+    const k = +kStr;
+    const g = document.createElementNS(svgNS,'g');
+    g.setAttribute('class','node');
+
+    if (k === SOURCE){
+      const mark = document.createElementNS(svgNS,'circle');
+      mark.setAttribute('class','source-mark');
+      mark.setAttribute('cx',x); mark.setAttribute('cy',y); mark.setAttribute('r',37);
+      g.appendChild(mark);
+      g.classList.add('source');
+    }
+
+    const ring = document.createElementNS(svgNS,'circle');
+    ring.setAttribute('class','ring');
+    ring.setAttribute('cx',x); ring.setAttribute('cy',y); ring.setAttribute('r',28);
+    g.appendChild(ring);
+
+    const label = document.createElementNS(svgNS,'text');
+    label.setAttribute('class','label');
+    label.setAttribute('x',x); label.setAttribute('y',y+6);
+    label.textContent = labels[k];
+    g.appendChild(label);
+
+    const distTxt = document.createElementNS(svgNS,'text');
+    distTxt.setAttribute('class','dist');
+    distTxt.setAttribute('x',x); distTxt.setAttribute('y',y+46);
+    distTxt.textContent = '∞';
+    g.appendChild(distTxt);
+
+    svg.appendChild(g);
+    nodeEls[k] = {g, distTxt};
+  });
+}
+
+/* ---------------- Rendering ---------------- */
+function pathFrom(prev, target){
+  const path = [];
+  let node = target;
+  while (node !== null && node !== undefined){
+    path.push(node);
+    node = prev[node];
+  }
+  path.reverse();
+  return (path.length && path[0]===SOURCE) ? path : null;
+}
+
+function render(){
+  const f = frames[idx];
+  if (!f) return;
+
+  // edges (edgeEls[key] is now an array — supports parallel edges/self-loops)
+  Object.values(edgeEls).forEach((els)=>{
+    els.forEach(({line,label})=>{
+      line.classList.remove('checking','tree');
+      label.classList.remove('checking','tree');
+    });
+  });
+  // permanent tree edges from prev[]
+  f.prev.forEach((p, v)=>{
+    if (p !== null){
+      const els = edgeEls[edgeKey(p,v)];
+      if (els) els.forEach(({line,label})=>{ line.classList.add('tree'); label.classList.add('tree'); });
+    }
+  });
+  // active edge this frame overrides with 'checking' color if applicable
+  if (f.edge){
+    const els = edgeEls[edgeKey(f.edge[0], f.edge[1])];
+    if (els && f.edgeState === 'checking'){
+      els.forEach(({line,label})=>{
+        line.classList.remove('tree'); line.classList.add('checking');
+        label.classList.remove('tree'); label.classList.add('checking');
+      });
+    }
+  }
+
+  // nodes
+  Object.entries(nodeEls).forEach(([kStr,{g,distTxt}])=>{
+    const k = +kStr;
+    g.classList.remove('visited','current');
+    if (f.visited.has(k)) g.classList.add('visited');
+    if (f.current === k) g.classList.add('current');
+    distTxt.textContent = f.dist[k]===Infinity ? '∞' : f.dist[k];
+  });
+
+  // narration
+  document.getElementById('stepMsg').textContent = f.msg;
+  document.getElementById('stepNow').textContent = idx+1;
+  document.getElementById('stepTotal').textContent = frames.length;
+  document.getElementById('stepProgress').value = (idx+1)/frames.length;
+
+  // priority queue
+  const pqDiv = document.getElementById('pqList');
+  pqDiv.innerHTML = '';
+  if (!f.pq.length){
+    pqDiv.innerHTML = '<span class="pq-empty">empty</span>';
+  } else {
+    f.pq.forEach(([d,v])=>{
+      const chip = document.createElement('div');
+      chip.className = 'pq-chip';
+      chip.innerHTML = `(<b>${d}</b>, ${labels[v]})`;
+      pqDiv.appendChild(chip);
+    });
+  }
+
+  // distance table
+  const body = document.getElementById('distBody');
+  body.innerHTML = '';
+  for (let v=0; v<N; v++){
+    const tr = document.createElement('tr');
+    if (f.current === v) tr.classList.add('row-current');
+    if (f.visited.has(v)) tr.classList.add('row-visited');
+    const d = f.dist[v];
+    const path = pathFrom(f.prev, v);
+    tr.innerHTML = `<td>${labels[v]}</td>
+      <td class="${d===Infinity?'dist-inf':''}">${d===Infinity?'INF':d}</td>
+      <td>${path ? path.map(p=>labels[p]).join(' → ') : '—'}</td>`;
+    body.appendChild(tr);
+  }
+
+  document.getElementById('btnPrev').disabled = idx===0;
+  document.getElementById('btnNext').disabled = idx===frames.length-1;
+}
+
+/* ---------------- Controls ---------------- */
+function goTo(i){ idx = Math.max(0, Math.min(frames.length-1, i)); render(); }
+document.getElementById('btnNext').addEventListener('click', ()=>goTo(idx+1));
+document.getElementById('btnPrev').addEventListener('click', ()=>goTo(idx-1));
+document.getElementById('btnReset').addEventListener('click', ()=>{ stopPlay(); goTo(0); });
+
+function stopPlay(){
+  clearInterval(playTimer); playTimer = null;
+  document.getElementById('btnPlay').textContent = '▶ Play';
+}
+function startPlay(){
+  document.getElementById('btnPlay').textContent = '⏸ Pause';
+  const speed = Number(document.getElementById('speedSelect').value) || 1400;
+  playTimer = setInterval(()=>{
+    if (idx >= frames.length-1){ stopPlay(); return; }
+    goTo(idx+1);
+  }, speed);
+}
+document.getElementById('btnPlay').addEventListener('click', ()=>{
+  if (playTimer){ stopPlay(); return; }
+  startPlay();
+});
+document.getElementById('speedSelect').addEventListener('change', ()=>{
+  // if currently playing, restart the interval at the new speed immediately
+  if (playTimer){ clearInterval(playTimer); startPlay(); }
+});
+
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'ArrowRight') goTo(idx+1);
+  if (e.key === 'ArrowLeft') goTo(idx-1);
+});
+
+/* ---------------- Build graph from inputs & run ---------------- */
+function initFromInputs(){
+  const text = document.getElementById('edgeInput').value;
+  const sourceRaw = document.getElementById('sourceInput').value;
+  const errorDiv = document.getElementById('inputError');
+  errorDiv.textContent = '';
+
+  try{
+    const parsed = parseGraph(text, sourceRaw);
+    graph = parsed.graph;
+    labels = parsed.labels;
+    SOURCE = parsed.source;
+    N = parsed.n;
+
+    positions = computeLayout(N);
+    buildSvg();
+    frames = runDijkstra();
+    idx = 0;
+    render();
+
+    document.getElementById('pageFooter').innerHTML =
+      `Source vertex: ${labels[SOURCE]} &nbsp;·&nbsp; step through with the controls, or press → / ← on your keyboard`;
+  }catch(err){
+    errorDiv.textContent = err.message;
+  }
+}
+
+document.getElementById('btnBuild').addEventListener('click', ()=>{
+  stopPlay();
+  initFromInputs();
+});
+
+document.getElementById('btnExample').addEventListener('click', ()=>{
+  document.getElementById('edgeInput').value =
+`0 1 4
+0 2 1
+1 3 1
+2 1 2
+2 3 5
+3 4 3
+4 5 2`;
+  document.getElementById('sourceInput').value = '0';
+  stopPlay();
+  initFromInputs();
+});
+
+// Run once on load so the visualization isn't blank
+initFromInputs();
+</script>
+</body>
+</html>
